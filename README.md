@@ -17,7 +17,9 @@ If you have any questions to why I have written something the way I have or have
 In order to build the ROM for the game install the following:\
 ``wla-dx`` (Assembler/Linker) [``wla-65816`` is the specific assembler and ``wlalinker`` is the linker]
 
-Then when dependencies are installed, run ``$make`` and ``GameOfLife.sfc`` will be made
+Then when dependencies are installed, run ``$make`` and ``GameOfLife.sfc`` will be made in the project base directory
+
+If you have "Mesen" installed (SNES Emulation for MacOS) you can also run ``$make run`` to test the rom directly after building.
 
 ---
 ### Credits:
