@@ -7,18 +7,30 @@
 .ORG 0
 .SECTION "VBlank"
 VBlank:
-    lda $4212      ;get joypad status
-    and #$00000001 ;if joy not ready
-    bne VBlank     ;branch back if not
+@WaitForJoypadStart:
+    lda $4212      
+    and #$00000001 
+    beq @WaitForJoypadStart ; Loops until bit 0 turns ON (1)
+
+    ; --- 2. WAIT FOR JOYPAD TO FINISH READING ---
+@WaitForJoypadFinish:
+    lda $4212      
+    and #$00000001 
+    bne @WaitForJoypadFinish ; Loops until bit 0 turns OFF (0)
+
     lda $4219      ;read joypad #1
-    sta $0201      ;store it
-    cmp $0200      ;Check if equal to prev
-    bne +
-    rti            ;if equal return
+    sta $0201      ;store it (high byte)
+    lda $4218      ;read joypad #2
+    sta $0202      ;store it (low byte)
+
+    AXY8           ; Make sure Accumulator is 8-bit
+    lda $0203      ; Load PREVIOUS frame's high byte
+    eor #$FF       ; EOR with $FF flips all the bits (This gives us NOT Previous)
+    and $0201      ; AND it with the CURRENT frame's high byte
+    sta $0205      ; Store the result! This is now your NEWLY PRESSED High Byte.
 
     ;a/b/x/y/l/r/e/t = A/B/X/Y/L/R/Select/Start button status.
     ;high = byetUDLR | low = axlr0000
-    + sta $0200    
 
     
     ;and #$00100000 ;Select Button
@@ -31,11 +43,66 @@ VBlank:
 
     ;and #$10000000 ;B Pressed
 
+    lda $0202 ;check if A is pressed
+    and #%10000000
+    bne @SetAlive ;if pressed, set alive
 
-    ;Cursor Logic
-    lda $0201      ;get control
+    lda $0201 ;check if B is pressed
+    and #%10000000
+    bne @SetDead;
+
+
+    jmp @SkipDraw ;neither A or B pressed, skip updating dead cells;
+@SetAlive
+    AXY16
+    lda #$0001     ; Load Tile 1 (Alive)
+    jmp @WriteTile ; Jump to writing phase
+
+@SetDead
+    AXY16   ; Switch to 16-bit A
+    lda #$0003    ; Load Tile 3 (Dead)
+    jmp @WriteTile ; Jump to writing phase  
+
+@WriteTile
+    sta $0208      ;Store tile to write
+    ; --- CALCULATE VRAM ADDRESS ---
+    ; Address = Base ($4000) + (Scroll Y * 32) + Scroll X
+    lda $0101      ;Load scroll Y
+    and #$00FF     ;Ensure it's within 0-255
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    sta $020A      ;Store Y offset    
+
+    lda $0100      ;Load scroll X
+    and #$00FF     ;Ensure it's within 0-255
+    clc
+    adc $020A      ; Add Y offset to X
+    clc
+    adc #$4000     ; Add Background VRAM Base Address ($4000)
+    tax
+
+    A8
+    ;lda #$80
+    ;sta $2115      ;Set VRAM transfer mode to word-access, increment by 1
+
+    stx $2116      ;Set VRAM Address for writing
+    A8
+    lda $0208      ;Load tile to write
+    sta $2118      ;Write tile to VRAM
+
+    AXY8
+
+    jmp @SkipDraw
+
+@SkipDraw
+
+    ;Cursor Logic (UDLR)
+    lda $0205      ;get control
     and #%00001111 ;care abt direction
-    sta $0201      ;store dirs
+    ;sta $0201      ;store dirs
 
     cmp #%00001000 ;up?
     bne +          ;skip if no
@@ -45,16 +112,18 @@ VBlank:
     dec $0101      ;sub 1 from Y
     +
 
-    lda $0201      ;get control
+    lda $0205      ;get control
+    and #%00001111 ;care abt direction
     cmp #%00000100 ;down?
     bne +          ;skip if no
     lda $0101      ;get scroll Y
-    cmp #$02       ;if on the bottom,
+    cmp #$1F       ;if on the bottom,
     beq +          ;don't do anything
     inc $0101      ;sub 1 from Y
     +
 
-    lda $0201      ;get control
+    lda $0205      ;get control
+    and #%00001111 ;care abt direction
     cmp #%00000010 ;left?
     bne +          ;skip if no
     lda $0100      ;get scroll X
@@ -63,16 +132,39 @@ VBlank:
     dec $0100      ;sub 1 from X
     +
 
-    lda $0201      ;get control
+    lda $0205      ;get control
+    and #%00001111 ;care abt direction
     cmp #%00000001 ;right?
     bne +          ;skip if no
     lda $0100      ;get scroll X
-    cmp #$02       ;if on the right,
+    cmp #$1F       ;if on the right,
     beq +          ;don't do anything
     inc $0100      ;sub 1 from X
     +
 
-    lda $0201      ;get control
+    stz $2102 ;OAM ADDRESS Low
+    stz $2103 ;OAM ADDRESS High
+
+    lda $0100 ;Load scroll X
+    asl a     ; x2
+    asl a     ; x4
+    asl a     ; x8 (tile size)
+    sta $2104 ;OAM Data
+
+    lda $0101 ;Load scroll Y
+    asl a     ; x2
+    asl a     ; x4
+    asl a     ; x8 (tile size)
+    sta $2104 ;OAM Data
+
+    lda #$00  ;First Sprite Name (Sprite 0)
+    sta $2104 ;OAM Data
+    lda #%00110000  ;No flip, prio, and pal 0
+    sta $2104 ;OAM Data
+
+    ;Cleanup
+    lda $0201       
+    sta $0203       ; Save Current High Byte to Previous High Byte
 
     rti ;finish...
 .ENDS
@@ -128,7 +220,7 @@ Start:
     sta $4301
 
     ; Set VRAM Dest to $6000 (Word Address $3000)
-    ldx #$3000
+    ldx #$6000
     stx $2116
 
     lda #$01                ; Fire DMA Channel 0
@@ -143,7 +235,7 @@ Start:
     sta $2104
     lda #$00  ;First Sprite Name (Sprite 0)
     sta $2104
-    lda #%00100000  ;No flip, prio, and pal 0
+    lda #%00110000  ;No flip, prio, and pal 0
     sta $2104
 
 
