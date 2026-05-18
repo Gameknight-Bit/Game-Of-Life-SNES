@@ -6,7 +6,7 @@
 ---
 ### Description:
 
-This game is an attempt at recreating the famous "Game of Life" simulation thought of by ___. I wanted to build this project, both as a proof of concept and an attempt at building by own assembly and systems knowledge.
+This game is an attempt at recreating the famous "Game of Life" simulation thought of by John Conway. I wanted to build this project, both as a proof of concept and an attempt at building by own assembly and systems knowledge.
 
 Feel free to use any of the code to your own discresion :)
 
