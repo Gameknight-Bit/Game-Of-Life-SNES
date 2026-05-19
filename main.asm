@@ -98,9 +98,47 @@ VBlank:
     jmp @SkipDraw
 
 @SkipDraw
+    AXY8           ; Ensure Accumulator is 8-bit
 
+    ; 1. Check if ANY D-Pad button is currently held
+    lda $0201      ; Current held buttons
+    and #%00001111 ; Mask out everything except U, D, L, R
+    beq @ResetDAS  ; If equal to zero (nothing held), reset the timer!
+
+    ; 2. Check if it is a BRAND NEW press
+    lda $0205      ; Newly pressed buttons (from your edge detection)
+    and #%00001111 
+    bne @InitialPress ; If a new D-Pad button was pressed, jump to initial setup
+
+    ; 3. Button is being HELD. Handle the Timer.
+    dec $0206      ; Subtract 1 from the DAS Timer
+    bne @SkipCursor; If the timer hasn't hit 0 yet, skip movement
+
+    ; 4. Timer hit 0! Trigger the auto-repeat slide.
+    lda #$04       ; SLIDE SPEED: Wait 4 frames between fast movements
+    sta $0206      ; Reset timer to short delay
+    lda $0201      ; Load the HELD buttons into Accumulator
+    and #%00001111
+    sta $0207
+    bra @MoveCursor
+
+
+@InitialPress:
+    lda #$14       ; INITIAL DELAY: Wait 20 frames (~1/3 second) before sliding
+    sta $0206      ; Set timer to long delay
+    lda $0205      ; Load the NEWLY PRESSED buttons into Accumulator
+    and #%00001111 
+    sta $0207
+    bra @MoveCursor
+
+@ResetDAS:
+    stz $0206      ; Store Zero to the DAS Timer (resets it)
+@SkipCursor:
+    bra @DoneCursor; Jump past the movement logic entirely
+
+@MoveCursor:
     ;Cursor Logic (UDLR)
-    lda $0205      ;get control
+    lda $0207      ;get control
     and #%00001111 ;care abt direction
     ;sta $0201      ;store dirs
 
@@ -112,7 +150,7 @@ VBlank:
     dec $0101      ;sub 1 from Y
     +
 
-    lda $0205      ;get control
+    lda $0207      ;get control
     and #%00001111 ;care abt direction
     cmp #%00000100 ;down?
     bne +          ;skip if no
@@ -122,7 +160,7 @@ VBlank:
     inc $0101      ;sub 1 from Y
     +
 
-    lda $0205      ;get control
+    lda $0207      ;get control
     and #%00001111 ;care abt direction
     cmp #%00000010 ;left?
     bne +          ;skip if no
@@ -132,7 +170,7 @@ VBlank:
     dec $0100      ;sub 1 from X
     +
 
-    lda $0205      ;get control
+    lda $0207      ;get control
     and #%00001111 ;care abt direction
     cmp #%00000001 ;right?
     bne +          ;skip if no
@@ -161,6 +199,17 @@ VBlank:
     sta $2104 ;OAM Data
     lda #%00110000  ;No flip, prio, and pal 0
     sta $2104 ;OAM Data
+
+@DoneCursor:
+    lda $0205      ; Load NEWLY PRESSED High Byte (Edge Detected!)
+    and #%00010000 ; Check Bit 4 (Start Button)
+    beq +; If not pressed, skip the toggle
+
+    ; Toggle the Simulation Flag
+    lda $0210      ; Load current flag state
+    eor #$01       ; Exclusive OR with 01 flips it! (00 becomes 01, 01 becomes 00)
+    sta $0210      ; Store it back
+    +
 
     ;Cleanup
     lda $0201       
@@ -301,9 +350,23 @@ Start:
     sta $4200
 
 loop:
+    lda $0210      ; Check Simulation Flag
+    beq @RunCursorMode
+
+    ; If running, JUMP to our new subroutine!
+    jsr RunSimulation 
+    bra @EndFrame
+
+@RunCursorMode:
+    ; (Your cursor movement and A/B button placement code goes here)
+    bra @EndFrame
+
+@EndFrame
     wai ;Wait for interrupt
     jmp loop
 .ENDS
+
+.include "Sim.asm"
 
 ;-------
 .BANK 1 SLOT 0
