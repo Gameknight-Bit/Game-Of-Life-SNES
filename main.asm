@@ -358,15 +358,15 @@ loop:
     bra @EndFrame
 
 @RunCursorMode:
-    ; (Your cursor movement and A/B button placement code goes here)
+    ; Cursor movement and stuff?
     bra @EndFrame
 
 @EndFrame
     wai ;Wait for interrupt
     jmp loop
-.ENDS
 
 .include "Sim.asm"
+.ENDS
 
 ;-------
 .BANK 1 SLOT 0

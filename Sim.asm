@@ -1,5 +1,3 @@
-; --- simulation.asm ---
-
 RunSimulation:
     AXY8
     
@@ -15,12 +13,12 @@ RunSimulation:
     ; --- Check TOP-LEFT Neighbor ---
     lda $0214      ; Load Current Row
     dec a          ; Row - 1 (Up)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0216      ; Store to Target Row
 
     lda $0215      ; Load Current Column
     dec a          ; Column - 1 (Left)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0217      ; Store to Target Column
 
     jsr GetNeighborState ; A now holds 00 or 01!
@@ -31,7 +29,7 @@ RunSimulation:
     ; --- Check TOP Neighbor ---
     lda $0214      ; Load Current Row
     dec a          ; Row - 1 (Up)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0216      ; Store to Target Row
 
     lda $0215      ; Load Current Column
@@ -45,12 +43,12 @@ RunSimulation:
     ; --- Check TOP-RIGHT Neighbor ---
     lda $0214      ; Load Current Row
     dec a          ; Row - 1 (Up)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0216      ; Store to Target Row
     
     lda $0215      ; Load Current Column
     inc a          ; Column + 1 (Right)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0217      ; Store to Target Column
 
     jsr GetNeighborState ; A now holds 00 or 01!
@@ -64,7 +62,7 @@ RunSimulation:
     
     lda $0215      ; Load Current Column
     dec a          ; Column - 1 (Left)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0217      ; Store to Target Column
 
     jsr GetNeighborState ; A now holds 00 or 01!
@@ -78,7 +76,7 @@ RunSimulation:
     
     lda $0215      ; Load Current Column
     inc a          ; Column + 1 (Right)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0217      ; Store to Target Column
 
     jsr GetNeighborState ; A now holds 00 or 01!
@@ -89,12 +87,12 @@ RunSimulation:
     ; --- Check BOTTOM-LEFT Neighbor ---
     lda $0214      ; Load Current Row
     inc a          ; Row + 1 (Down)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0216      ; Store to Target Row
     
     lda $0215      ; Load Current Column
     dec a          ; Column - 1 (Left)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0217      ; Store to Target Column
 
     jsr GetNeighborState ; A now holds 00 or 01!
@@ -105,7 +103,7 @@ RunSimulation:
     ; --- Check BOTTOM Neighbor ---
     lda $0214      ; Load Current Row
     inc a          ; Row + 1 (Down)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0216      ; Store to Target Row
     
     lda $0215      ; Load Current Column
@@ -119,12 +117,12 @@ RunSimulation:
     ; --- Check BOTTOM-RIGHT Neighbor ---
     lda $0214      ; Load Current Row
     inc a          ; Row + 1 (Down)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0216      ; Store to Target Row
     
     lda $0215      ; Load Current Column
     inc a          ; Column + 1 (Right)
-    and #$1F       ; Wrap-around magic!
+    and #$1F       ; Wrap-around
     sta $0217      ; Store to Target Column
 
     jsr GetNeighborState ; A now holds 00 or 01!
@@ -175,12 +173,16 @@ RunSimulation:
     inc $0215      ;inc col counter  
     lda $0215
     cmp #$20       ;are we at col 32?
-    bne @ColLoop
+    beq @ColLoopDone ;Inversion to allow for 16-bit reference jumps
+    jmp @ColLoop     
+@ColLoopDone:
 
     inc $0214      ;inc row counter
     lda $0214
     cmp #$20       ;are we at row 32?
-    bne @RowLoop
+    beq @RowLoopDone 
+    jmp @RowLoop     
+@RowLoopDone:
 
     ; -------------------------------------------------------------
     ; [4] BUFFER SWAP (Optimized 16-bit Manual Loop)
@@ -204,6 +206,9 @@ RunSimulation:
 
 
 GetNeighborState:
+    ; In: $0216 - Target Row, $0217 - Target Column
+    ; Out: A = 00 or 01 depending on if the cell is alive or dead
+
     A16
     
     lda $0216      ; Load Target Row

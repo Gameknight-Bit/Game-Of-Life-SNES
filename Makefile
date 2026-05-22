@@ -1,4 +1,4 @@
-ROMNAME = tictactoe.sfc
+ROMNAME = gameoflife.sfc
 
 # Assembler and Linker
 AS      = wla-65816
